@@ -67,6 +67,18 @@ def ensure_consent_columns():
             )
 
 
+def ensure_patient_abha_index():
+    if engine.dialect.name != "postgresql":
+        return
+    inspector = inspect(engine)
+    if not inspector.has_table("patients"):
+        return
+    with engine.begin() as connection:
+        connection.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_patients_abha_id ON patients (abha_id)"
+        ))
+
+
 def get_db():
     db = SessionLocal()
 

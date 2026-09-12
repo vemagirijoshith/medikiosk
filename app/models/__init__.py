@@ -1,3 +1,4 @@
+from app.models.abdm_share_audit import ABDMShareAudit
 from app.models.allergy import Allergy
 from app.models.consultation import Consultation
 from app.models.consent import Consent
@@ -9,6 +10,7 @@ from app.models.patient import Patient
 from app.models.symptom import Symptom
 
 __all__ = [
+	"ABDMShareAudit",
 	"Allergy",
 	"Consultation",
 	"Consent",

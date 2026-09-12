@@ -91,6 +91,37 @@ points are the clinical history, document processing/extraction, and clinical
 summary boundaries. Future ABDM sharing must check `abdm_sharing` explicitly.
 ABHA authentication and ABDM API integration are not implemented yet.
 
+### D2 ABDM/ABHA integration foundation
+
+ABHA linking is local and sandbox-ready only. `PUT
+/patients/{patient_id}/abha` stores a normalized 14-digit identifier and does
+not claim ABDM verification. `POST /patients/{patient_id}/abdm/export` requires
+active `abdm_sharing` consent, builds an export from existing structured
+MediKiosk data, and records an audit event. With `ABDM_SANDBOX_MODE=true`, the
+response is `sandbox_ready`; no real ABDM transmission or fake production API
+call is made. Client secrets, tokens, OTPs, Aadhaar numbers, and credentials
+are never stored or returned.
+
+The D2 service boundary is ready for a future official ABDM sandbox adapter.
+Official ABDM contracts and sandbox credentials must be obtained before adding
+external network calls.
+
+### D2 ABDM/ABHA foundation
+
+ABHA linking is currently local and sandbox-ready only. `PUT
+/patients/{patient_id}/abha` stores a conservatively normalized ABHA identifier;
+it does not verify the identifier with ABDM. `POST
+/patients/{patient_id}/abdm/export` requires active `abdm_sharing` consent and
+builds a structured export from existing MediKiosk records. With
+`ABDM_SANDBOX_MODE=true`, it returns `sandbox_ready` and does not transmit data
+to ABDM. No fake ABDM endpoints or network calls are made.
+
+Configure `ABDM_BASE_URL`, `ABDM_CLIENT_ID`, `ABDM_CLIENT_SECRET`, and
+`ABDM_SANDBOX_MODE` through environment variables only. Official ABDM sandbox
+credentials and documented API contracts are required before adding an actual
+external connector. Export attempts are recorded in `abdm_share_audits` without
+storing secrets, tokens, OTPs, or Aadhaar numbers.
+
 Document uploads accept multipart form data with `patient_id`, an optional
 `encounter_id`, and `file`. Files are limited to 10 MB, checked by MIME type
 and magic bytes, stored under a UUID-based name in `storage/documents/`, and
