@@ -164,6 +164,29 @@ does not diagnose, prescribe, recommend treatment, or provide medical advice.
 
 ## Current provider limitation
 
+### D3 physician review workflow
+
+D3 provides a consent-gated, read-only physician review packet at `GET
+/patients/{patient_id}/physician-review-packet` (optionally scoped with
+`encounter_id`). It combines existing patient history, documents, OCR/B5
+extractions, and deterministic B6 intelligence while retaining source document
+and OCR-result IDs. It does not make AI or external API calls, create clinical
+facts, or modify source records.
+
+Review actions require active `physician_review` consent and use only controlled
+transitions: `pending` → `in_review` (notes), `verified`, then `completed`.
+`POST /patients/{patient_id}/consultations/{consultation_id}/review/notes`,
+`/verify`, and `/complete` append immutable D3 audit events. Verification is
+explicit and separate from AI/automated extraction; source data is never
+silently promoted to physician-verified information.
+
+Physician authentication is not implemented. `physician_id` is an optional
+external identifier supplied by the request, is never authenticated or treated
+as identity proof, and no credentials, tokens, secrets, Aadhaar numbers, or
+unnecessary raw PHI are stored in D3 audit metadata. Clinical summaries are not
+persisted in the current system; D3 marks that packet section as unavailable
+rather than generating a new AI summary.
+
 The clinical history engine uses NVIDIA's OpenAI-compatible API with
 `nvidia/nemotron-3-ultra-550b-a55b`. The backend still starts normally if the
 provider is unavailable. Intake messages translate provider rate limits into

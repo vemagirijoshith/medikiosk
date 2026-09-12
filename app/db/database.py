@@ -79,6 +79,26 @@ def ensure_patient_abha_index():
         ))
 
 
+def ensure_physician_review_columns():
+    """Add D3 fields without altering existing consultation data."""
+    if engine.dialect.name != "postgresql":
+        return
+    inspector = inspect(engine)
+    if not inspector.has_table("consultations"):
+        return
+    existing_columns = {column["name"] for column in inspector.get_columns("consultations")}
+    additions = {
+        "review_status": "ALTER TABLE consultations ADD COLUMN review_status VARCHAR(20) NOT NULL DEFAULT 'pending'",
+        "physician_id": "ALTER TABLE consultations ADD COLUMN physician_id VARCHAR(255)",
+        "physician_notes": "ALTER TABLE consultations ADD COLUMN physician_notes TEXT",
+        "reviewed_at": "ALTER TABLE consultations ADD COLUMN reviewed_at TIMESTAMP WITH TIME ZONE",
+    }
+    with engine.begin() as connection:
+        for column_name, statement in additions.items():
+            if column_name not in existing_columns:
+                connection.execute(text(statement))
+
+
 def get_db():
     db = SessionLocal()
 
