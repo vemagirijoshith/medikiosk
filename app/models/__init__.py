@@ -1,0 +1,21 @@
+from app.models.allergy import Allergy
+from app.models.consultation import Consultation
+from app.models.consent import Consent
+from app.models.document import Document
+from app.models.encounter import Encounter
+from app.models.medication import Medication
+from app.models.ocr_result import OCRResult
+from app.models.patient import Patient
+from app.models.symptom import Symptom
+
+__all__ = [
+	"Allergy",
+	"Consultation",
+	"Consent",
+	"Document",
+	"Encounter",
+	"Medication",
+	"OCRResult",
+	"Patient",
+	"Symptom",
+]
