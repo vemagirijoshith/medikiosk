@@ -129,3 +129,38 @@ def test_malformed_ai_response_returns_safe_error_and_does_not_persist(
         assert db.query(Symptom).filter_by(encounter_id=encounter.id).count() == 0
     finally:
         db.close()
+
+
+def test_parse_ai_output_normalizes_string_red_flags_and_numeric_severity():
+    from app.api.intake import _parse_ai_output
+
+    sample_ai_json = '''{
+        "assistant_message": "మీకు వాంతులు లేదా కళ్లు తిరగడం వంటి ఇతర లక్షణాలు ఏమైనా ఉన్నాయా?",
+        "status": "collecting",
+        "clinical_data": {
+            "chief_complaint": "తీవ్రమైన తలనొప్పి",
+            "onset": null,
+            "duration": null,
+            "location": "తల",
+            "severity": 10,
+            "character": null,
+            "timing": null,
+            "aggravating_factors": [],
+            "relieving_factors": [],
+            "associated_symptoms": [],
+            "medical_history": [],
+            "medications": [],
+            "allergies": [],
+            "relevant_history": []
+        },
+        "red_flags": [
+            "Severe headache rated 10/10"
+        ],
+        "next_section": "onset"
+    }'''
+    output = _parse_ai_output(sample_ai_json)
+    assert output.status == "collecting"
+    assert len(output.red_flags) == 1
+    assert output.red_flags[0].message == "Severe headache rated 10/10"
+    assert output.red_flags[0].severity == "high"
+    assert output.clinical_data["severity"] == 10

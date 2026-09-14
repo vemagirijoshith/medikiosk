@@ -75,12 +75,16 @@ async def generate_clinical_response(
     *,
     language: str = "en",
 ) -> str:
-    api_key = os.getenv("NVIDIA_API_KEY")
-    base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
-    model = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
-
+    api_key = os.getenv("GROQ_API_KEY") or os.getenv("NVIDIA_API_KEY")
     if not api_key:
         raise AIAuthenticationError("AI provider credentials are not configured")
+
+    if api_key.startswith("gsk_"):
+        base_url = os.getenv("GROQ_BASE_URL") or os.getenv("NVIDIA_BASE_URL") or "https://api.groq.com/openai/v1"
+        model = os.getenv("GROQ_MODEL") or os.getenv("NVIDIA_MODEL") or "openai/gpt-oss-120b"
+    else:
+        base_url = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+        model = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
 
     messages = [
         {"role": "system", "content": f"{SYSTEM_PROMPT}\nRespond in language: {language}."},

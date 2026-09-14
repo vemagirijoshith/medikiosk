@@ -1,15 +1,22 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 IntakeStatus = Literal["collecting", "ready_for_review", "needs_staff_attention"]
 
 
 class RedFlag(BaseModel):
-    type: str
-    severity: Literal["low", "medium", "high"]
+    type: str = "urgent_symptom"
+    severity: Literal["low", "medium", "high"] = "high"
     message: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_red_flag(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            return {"type": "urgent_symptom", "severity": "high", "message": data}
+        return data
 
 
 class ClinicalOutput(BaseModel):
@@ -51,3 +58,8 @@ class IntakeMessageResponse(BaseModel):
     status: IntakeStatus
     extracted_data: dict[str, Any] = Field(default_factory=dict)
     red_flags: list[RedFlag] = Field(default_factory=list)
+
+
+class TranscriptionResponse(BaseModel):
+    transcript: str
+    language: str | None = None

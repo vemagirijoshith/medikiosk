@@ -74,7 +74,7 @@ def _normalize_response(payload: dict[str, Any], page_index: int) -> dict[str, A
 
 
 async def extract_document_text(path: Path, content_type: str) -> dict[str, Any]:
-    api_key = os.getenv("NVIDIA_API_KEY")
+    api_key = os.getenv("NVIDIA_OCR_API_KEY") or os.getenv("NVIDIA_API_KEY")
     base_url = os.getenv("NVIDIA_OCR_BASE_URL", OCR_BASE_URL).rstrip("/")
     if not api_key:
         raise AIAuthenticationError("OCR provider credentials are not configured")

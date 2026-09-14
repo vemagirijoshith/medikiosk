@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PatientCreate(BaseModel):
@@ -21,3 +23,29 @@ class PatientResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ConsultationCreate(BaseModel):
+    """Create the review record for an existing patient encounter."""
+
+    encounter_id: int = Field(gt=0)
+
+
+class ConsultationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    patient_id: int
+    encounter_id: int
+    review_status: str
+    created_at: datetime
+
+
+class PhysicianReviewListItem(BaseModel):
+    consultation_id: int
+    patient_id: int
+    patient_name: str
+    encounter_id: int
+    chief_complaint: str | None
+    review_status: str
+    created_at: datetime

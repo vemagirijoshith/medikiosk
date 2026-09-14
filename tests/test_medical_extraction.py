@@ -43,6 +43,7 @@ def completion(content):
 @pytest.mark.asyncio
 async def test_extraction_service_uses_nvidia_chat_configuration(monkeypatch):
     monkeypatch.setenv("NVIDIA_API_KEY", "synthetic-test-key")
+    monkeypatch.setenv("NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b")
     fake_create = AsyncMock(return_value=completion('{"patient":{}}'))
     fake_client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create)))
     with patch("app.services.medical_extraction_service.AsyncOpenAI", return_value=fake_client) as client_class:

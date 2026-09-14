@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -17,6 +17,7 @@ from app.schemas.intake import (
     IntakeStartRequest,
     IntakeStartResponse,
     RedFlag,
+    TranscriptionResponse,
 )
 from app.services.ai_service import (
     AIAuthenticationError,
@@ -26,6 +27,7 @@ from app.services.ai_service import (
     AIUpstreamError,
     generate_clinical_response,
 )
+from app.services.transcription_service import transcribe_audio
 
 
 router = APIRouter(prefix="/intake", tags=["Clinical Intake"])
@@ -34,6 +36,14 @@ INITIAL_QUESTION = (
     "Hello. I will help collect your medical history before you meet the doctor. "
     "What is the main problem or symptom you are experiencing today?"
 )
+
+INITIAL_QUESTIONS = {
+    "en": INITIAL_QUESTION,
+    "hi": "नमस्ते। डॉक्टर से मिलने से पहले मैं आपका स्वास्थ्य इतिहास एकत्र करने में मदद करूँगा। आज आपको मुख्य समस्या या लक्षण क्या है?",
+    "te": "నమస్కారం. మీరు వైద్యుడిని కలిసే ముందు మీ ఆరోగ్య చరిత్రను సేకరించడంలో నేను సహాయం చేస్తాను. ఈ రోజు మీరు ఎదుర్కొంటున్న ప్రధాన సమస్య లేదా లక్షణం ఏమిటి?",
+    "ta": "வணக்கம். மருத்துவரை சந்திப்பதற்கு முன் உங்கள் மருத்துவ வரலாற்றை சேகரிக்க நான் உதவுகிறேன். இன்று நீங்கள் சந்திக்கும் முக்கிய பிரச்சனை அல்லது அறிகுறி என்ன?",
+    "bn": "নমস্কার। ডাক্তারের সাথে দেখা করার আগে আমি আপনার চিকিৎসার ইতিহাস সংগ্রহ করতে সাহায্য করব। আজ আপনার প্রধান সমস্যা বা উপসর্গ কী?",
+}
 
 # The API owns active context; durable clinical facts are stored in ORM rows.
 _conversations: dict[int, list[dict[str, str]]] = {}
@@ -62,8 +72,41 @@ def _parse_ai_output(raw: str) -> ClinicalOutput:
     candidate = raw.strip()
     if candidate.startswith("```"):
         candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate).strip()
+
+    if "{" in candidate and "}" in candidate:
+        start = candidate.find("{")
+        end = candidate.rfind("}") + 1
+        candidate_json = candidate[start:end]
+    else:
+        candidate_json = candidate
+
     try:
-        return ClinicalOutput.model_validate(json.loads(candidate))
+        data = json.loads(candidate_json)
+        if isinstance(data, dict):
+            raw_flags = data.get("red_flags")
+            if isinstance(raw_flags, list):
+                norm_flags = []
+                for f in raw_flags:
+                    if isinstance(f, str):
+                        norm_flags.append({
+                            "type": "urgent_symptom",
+                            "severity": "high",
+                            "message": f,
+                        })
+                    elif isinstance(f, dict):
+                        norm_flags.append(f)
+                data["red_flags"] = norm_flags
+            elif isinstance(raw_flags, str):
+                data["red_flags"] = [{
+                    "type": "urgent_symptom",
+                    "severity": "high",
+                    "message": raw_flags,
+                }]
+
+            if data.get("status") not in {"collecting", "ready_for_review", "needs_staff_attention"}:
+                data["status"] = "collecting"
+
+        return ClinicalOutput.model_validate(data)
     except (json.JSONDecodeError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -75,7 +118,10 @@ def _persist_clinical_data(
     db: Session, encounter: Encounter, clinical_data: dict[str, Any]
 ) -> None:
     def text_value(value: Any) -> str | None:
-        return value.strip() if isinstance(value, str) and value.strip() else None
+        if value is None:
+            return None
+        s = str(value).strip()
+        return s if s else None
 
     chief_complaint = clinical_data.get("chief_complaint")
     chief_complaint_text = text_value(chief_complaint)
@@ -115,9 +161,11 @@ def start_intake(
     db.refresh(encounter)
     _conversations[encounter.id] = []
 
+    initial_msg = INITIAL_QUESTIONS.get(request.language, INITIAL_QUESTION)
+
     return IntakeStartResponse(
         encounter_id=encounter.id,
-        assistant_message=INITIAL_QUESTION,
+        assistant_message=initial_msg,
         status="collecting",
     )
 
@@ -202,3 +250,46 @@ def terminate_intake_session(
     db.commit()
     
     return None
+
+
+@router.post(
+    "/transcribe",
+    response_model=TranscriptionResponse,
+    summary="Transcribe spoken audio via Groq Whisper",
+)
+async def transcribe_voice(
+    file: UploadFile = File(...),
+    language: str | None = Form(None),
+) -> TranscriptionResponse:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Missing audio file.")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded audio file is empty.")
+
+    if len(content) > 25 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Audio file exceeds 25 MB limit.",
+        )
+
+    try:
+        transcript = await transcribe_audio(
+            file_bytes=content,
+            filename=file.filename or "recording.webm",
+            content_type=file.content_type or "audio/webm",
+            language=language,
+        )
+    except AIAuthenticationError as exc:
+        raise HTTPException(status_code=502, detail="Transcription authentication failed.") from exc
+    except AIRateLimitError as exc:
+        raise HTTPException(status_code=503, detail="Transcription service is rate-limited.") from exc
+    except AITimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Transcription request timed out.") from exc
+    except AIConnectionError as exc:
+        raise HTTPException(status_code=503, detail="Transcription service could not be reached.") from exc
+    except AIUpstreamError as exc:
+        raise HTTPException(status_code=502, detail="Transcription service returned an error.") from exc
+
+    return TranscriptionResponse(transcript=transcript, language=language)
