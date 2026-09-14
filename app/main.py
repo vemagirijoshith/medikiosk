@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.db.database import Base, engine, ensure_consent_columns, ensure_document_upload_columns, ensure_patient_abha_index, ensure_physician_review_columns
 from app.models import Patient
@@ -42,6 +45,9 @@ app.include_router(clinical_summary_router)
 app.include_router(consent_router)
 app.include_router(abdm_router)
 app.include_router(physician_review_router)
+
+frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+app.mount("/kiosk", StaticFiles(directory=frontend_dir, html=True), name="kiosk")
 
 
 @app.get("/")

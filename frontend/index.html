@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediKiosk | Clinical Intake</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/kiosk/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/kiosk/" aria-label="MediKiosk home">
+      <span class="brand-mark" aria-hidden="true">+</span>
+      <span><strong>Medi<span>Kiosk</span></strong><small>SMART CLINICAL INTAKE</small></span>
+    </a>
+    <nav aria-label="Primary navigation"><a class="active" href="#check-in">Patient Check-In</a><a href="/docs" target="_blank">API Docs</a></nav>
+    <div class="top-actions"><div class="languages" role="group" aria-label="Language"><button class="selected" data-language="en">EN</button><button data-language="hi">हिन्दी</button><button data-language="ta">தமிழ்</button></div><button class="icon-button" id="audio-button" aria-label="Audio guide">◖<span>Audio Guide</span></button><button class="danger-button" id="nurse-button">! <span>Call Nurse</span></button></div>
+  </header>
+
+  <main>
+    <section id="check-in" class="page-section welcome-view">
+      <div class="hospital-strip"><div><span class="hospital-icon">+</span><span><strong>Metro Health OP-East</strong><small>Outpatient Block B · Terminal K-04</small></span></div><span class="status"><i></i> System online</span></div>
+      <div class="hero panel"><span class="eyebrow">SEAMLESS HOSPITAL ADMISSION & TRIAGE</span><h1>Welcome to MediKiosk</h1><p>Complete your clinical history before meeting the doctor.</p><div class="stats"><span><b>&lt; 90s</b>Average check-in</span><span><b>12+</b>Regional languages</span><span><b>100%</b>Doctor-ready record</span></div></div>
+      <div class="mode-grid"><button class="mode-card primary" id="voice-mode"><span class="mode-icon">◉</span><span><b>Start with Voice</b><small>Speak naturally in your preferred language. No typing required.</small></span><em>Recommended →</em></button><button class="mode-card" id="touch-mode"><span class="mode-icon blue">⌨</span><span><b>Start with Touch / Text</b><small>Type your symptoms and select options manually on screen.</small></span><em>Self service →</em></button></div>
+      <div class="content-grid"><section class="panel registration"><div class="section-heading"><div><span class="eyebrow">FAST ROUTE CHECK-IN</span><h2>Tell us who you are</h2></div><span class="step">Step 1 of 3</span></div><form id="patient-form"><label>Full name<input name="name" required minlength="2" placeholder="e.g. Rajesh Kumar" autocomplete="name"></label><div class="two-col"><label>Age<input name="age" required type="number" min="0" max="120" placeholder="48"></label><label>Gender<select name="gender"><option value="not_specified">Prefer not to say</option><option>female</option><option>male</option><option>other</option></select></label></div><label>Mobile number <span class="optional">(optional)</span><input name="phone" type="tel" placeholder="9876543210" autocomplete="tel"></label><button class="primary-button" type="submit">Start clinical intake <span>→</span></button><p class="form-note" id="form-status" role="status"></p></form></section><aside class="side-stack"><div class="panel help-card"><span class="eyebrow">NEED ASSISTANCE?</span><h2>We can help you get started.</h2><p>Use the large buttons, choose a language, or ask a staff member for support at any time.</p><button class="outline-button" id="side-nurse">Call a nurse</button></div><div class="privacy-note">▣ <span>Your answers are shared with the clinical team for this visit only.</span></div></aside></div>
+    </section>
+
+    <section id="intake" class="page-section intake-view hidden"><div class="intake-header"><div><span class="eyebrow">CLINICAL HISTORY</span><h1>Hello, <span id="patient-name">patient</span></h1><p>Answer one question at a time. You can type or use your device microphone.</p></div><div class="progress-wrap"><span id="intake-status">Collecting history</span><div class="progress"><i></i></div></div></div><div class="intake-grid"><section class="panel conversation-panel"><div class="assistant"><span class="assistant-avatar">+</span><span><strong>MediKiosk Assistant</strong><small>Guided clinical intake</small></span><button id="repeat-button" class="small-button">Repeat question</button></div><div id="conversation" class="conversation" aria-live="polite"></div><form id="message-form" class="message-form"><textarea id="message-input" rows="2" required maxlength="5000" placeholder="Type your answer here..."></textarea><div><button type="button" class="voice-button" id="mic-button">◉ Use voice</button><button class="primary-button" type="submit">Send answer <span>→</span></button></div></form><p class="form-note" id="message-status" role="status"></p></section><aside class="panel roadmap"><span class="eyebrow">YOUR VISIT</span><h2>Intake roadmap</h2><div class="roadmap-item done"><i>✓</i><span><b>Patient details</b><small>Completed</small></span></div><div class="roadmap-item active"><i>2</i><span><b>Current symptoms</b><small>Tell us what brought you in</small></span></div><div class="roadmap-item"><i>3</i><span><b>Medical history</b><small>Medications and allergies</small></span></div><div class="roadmap-item"><i>4</i><span><b>Ready for review</b><small>Doctor-facing summary</small></span></div><div class="safety-note">! <span>If you have severe chest pain, difficulty breathing, heavy bleeding, or have passed out, call a nurse immediately.</span></div></aside></div></section>
+  </main>
+
+  <dialog id="nurse-dialog"><div class="dialog-icon">!</div><h2>Call a nurse?</h2><p>A staff member will come to this kiosk. For life-threatening emergencies, call local emergency services.</p><div><button class="outline-button" id="cancel-nurse">Cancel</button><button class="danger-button" id="confirm-nurse">Request assistance</button></div></dialog>
+  <footer><span><i></i> Secure kiosk session</span><span>Privacy-first clinical intake · <a href="/docs" target="_blank">System status</a></span></footer>
+  <script src="/kiosk/app.js"></script>
+</body>
+</html>
