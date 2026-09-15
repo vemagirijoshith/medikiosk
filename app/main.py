@@ -68,8 +68,16 @@ frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/kiosk", StaticFiles(directory=frontend_dir, html=True), name="kiosk")
 
 
+@app.get("/healthz")
+def healthz():
+    return {
+        "status": "ok"
+    }
+
+
 @app.get("/")
 def root():
     return {
         "message": "MediKiosk Backend is running 🚀"
     }
+
