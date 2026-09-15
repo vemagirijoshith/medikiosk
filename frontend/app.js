@@ -3,7 +3,17 @@
  * Frontend Architecture & API Integration Layer
  */
 
-const API_BASE = window.location.origin.includes(':8001') ? '' : 'http://127.0.0.1:8001';
+const CONFIG = window.MEDIKIOSK_CONFIG || {};
+const IS_LOCAL = typeof CONFIG.IS_LOCAL === "boolean"
+  ? CONFIG.IS_LOCAL
+  : (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.port === "8001");
+
+const API_BASE = typeof CONFIG.API_BASE === "string"
+  ? CONFIG.API_BASE
+  : (IS_LOCAL
+      ? (window.location.origin.includes(':8001') ? '' : 'http://127.0.0.1:8001')
+      : 'https://medikiosk-yri0.onrender.com');
+
 const API_TIMEOUT = 35000;
 
 const PURPOSES = [
@@ -941,7 +951,8 @@ async function api(endpoint, options = {}) {
       throw timeoutErr;
     }
     if (error instanceof TypeError && error.message.toLowerCase().includes("fetch")) {
-      const netErr = new Error("Cannot reach MediKiosk backend at 127.0.0.1:8001. Please check that FastAPI is running.");
+      const target = API_BASE || window.location.origin;
+      const netErr = new Error(`Cannot reach MediKiosk backend at ${target}. Please check that the server is running.`);
       netErr.status = 0;
       throw netErr;
     }
@@ -952,19 +963,17 @@ async function api(endpoint, options = {}) {
 }
 
 async function checkBackendHealth() {
+  const connEl = document.querySelector("#connection-status");
+  const lblEl = document.querySelector("#backend-label");
   try {
-    const res = await api("/", { timeout: 4000 });
+    const res = await api("/healthz", { timeout: 4000 });
     state.backendConnected = true;
-    const connEl = document.querySelector("#connection-status");
-    const lblEl = document.querySelector("#backend-label");
     if (connEl && lblEl) {
       connEl.className = "connection online";
-      lblEl.textContent = "Backend :8001 Ready";
+      lblEl.textContent = IS_LOCAL ? "Backend :8001 Ready" : "Backend Connected";
     }
   } catch (e) {
     state.backendConnected = false;
-    const connEl = document.querySelector("#connection-status");
-    const lblEl = document.querySelector("#backend-label");
     if (connEl && lblEl) {
       connEl.className = "connection offline";
       lblEl.textContent = "Backend Offline";
@@ -3244,19 +3253,13 @@ async function transcribeAudioBlob(audioFile) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/intake/transcribe`, {
+    const data = await api("/intake/transcribe", {
       method: "POST",
       body: formData,
+      timeout: 45000,
     });
 
     state.isTranscribing = false;
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.detail || `Server returned ${res.status}`);
-    }
-
-    const data = await res.json();
     const transcript = (data.transcript || "").trim();
 
     if (!transcript) {
