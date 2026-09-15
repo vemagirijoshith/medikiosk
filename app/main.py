@@ -4,7 +4,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.db.database import Base, engine, ensure_consent_columns, ensure_document_upload_columns, ensure_patient_abha_index, ensure_physician_review_columns
+from app.db.database import (
+    Base, engine, ensure_consent_columns, ensure_document_upload_columns,
+    ensure_patient_abha_index, ensure_physician_review_columns,
+    ensure_queue_priority_columns
+)
 from app.models import Patient
 from app.models import Allergy, Consultation, Consent, Document, Encounter, Medication, OCRResult, PhysicianReviewAudit, Symptom
 from app.api.patients import router as patient_router
@@ -16,11 +20,16 @@ from app.api.abdm import router as abdm_router
 from app.api.physician_review import router as physician_review_router
 
 
-ensure_document_upload_columns()
-ensure_consent_columns()
-ensure_physician_review_columns()
-Base.metadata.create_all(bind=engine)
-ensure_patient_abha_index()
+try:
+    ensure_document_upload_columns()
+    ensure_consent_columns()
+    ensure_physician_review_columns()
+    ensure_queue_priority_columns()
+    Base.metadata.create_all(bind=engine)
+    ensure_patient_abha_index()
+except Exception as exc:
+    import logging
+    logging.getLogger("uvicorn.error").warning(f"Database schema auto-init deferred: {exc}")
 
 
 app = FastAPI(

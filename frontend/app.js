@@ -47,11 +47,32 @@ const PURPOSES = [
 ];
 
 const LANGUAGES = [
-  { code: "en", label: "English", native: "English", sub: "Primary kiosk language" },
-  { code: "hi", label: "Hindi", native: "हिन्दी", sub: "हिंदी में जारी रखें" },
-  { code: "te", label: "Telugu", native: "తెలుగు", sub: "తెలుగులో కొనసాగించండి" },
-  { code: "ta", label: "Tamil", native: "தமிழ்", sub: "தமிழில் தொடரவும்" },
-  { code: "bn", label: "Bengali", native: "বাংলা", sub: "বাংলায় চালিয়ে যান" },
+  // Tier 1: Fully Localized Kiosk UI + Voice Assisted
+  { code: "en", label: "English", native: "English", sub: "Primary kiosk language", tier: "full" },
+  { code: "hi", label: "Hindi", native: "हिन्दी", sub: "हिंदी में जारी रखें", tier: "full" },
+  { code: "te", label: "Telugu", native: "తెలుగు", sub: "తెలుగులో కొనసాగించండి", tier: "full" },
+  { code: "ta", label: "Tamil", native: "தமிழ்", sub: "தமிழில் தொடரவும்", tier: "full" },
+  { code: "bn", label: "Bengali", native: "বাংলা", sub: "বাংলায় চালিয়ে যান", tier: "full" },
+
+  // Tier 2: 17 Scheduled Languages of India — Speech Assisted (Groq Whisper)
+  { code: "mr", label: "Marathi", native: "मराठी", sub: "मराठीत बोला (Speech Assisted)", tier: "speech" },
+  { code: "gu", label: "Gujarati", native: "ગુજરાતી", sub: "ગુજરાતીમાં બોલો (Speech Assisted)", tier: "speech" },
+  { code: "kn", label: "Kannada", native: "ಕನ್ನಡ", sub: "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ (Speech Assisted)", tier: "speech" },
+  { code: "ml", label: "Malayalam", native: "മലയാളം", sub: "മലയാളത്തിൽ സംസാരിക്കുക (Speech Assisted)", tier: "speech" },
+  { code: "pa", label: "Punjabi", native: "ਪੰਜਾਬੀ", sub: "ਪੰਜਾਬੀ ਵਿੱਚ ਬੋਲੋ (Speech Assisted)", tier: "speech" },
+  { code: "or", label: "Odia", native: "ଓଡ଼ିଆ", sub: "ଓଡ଼ିଆରେ କୁహନ୍ତు (Speech Assisted)", tier: "speech" },
+  { code: "as", label: "Assamese", native: "অসমীয়া", sub: "অসমীয়াত কওক (Speech Assisted)", tier: "speech" },
+  { code: "ur", label: "Urdu", native: "اردو", sub: "اردو میں بولیں (Speech Assisted)", tier: "speech" },
+  { code: "sa", label: "Sanskrit", native: "संस्कृतम्", sub: "संस्कृतेन वदतु (Speech Assisted)", tier: "speech" },
+  { code: "mai", label: "Maithili", native: "मैथिली", sub: "मैथिली में बाजु (Speech Assisted)", tier: "speech" },
+  { code: "sat", label: "Santali", native: "ᱥᱟᱱᱛᱟᱲᱤ", sub: "ᱥᱟᱱᱛᱟᱲᱤᱛᱮ ᱨᱚᱲ (Speech Assisted)", tier: "speech" },
+  { code: "ks", label: "Kashmiri", native: "کٲشُر", sub: "کٲشُر بولِو (Speech Assisted)", tier: "speech" },
+  { code: "ne", label: "Nepali", native: "नेपाली", sub: "नेपालीमा बोल्नुहोस् (Speech Assisted)", tier: "speech" },
+  { code: "sd", label: "Sindhi", native: "سنڌي", sub: "سنڌيءَ ۾ ڳالهايو (Speech Assisted)", tier: "speech" },
+  { code: "kok", label: "Konkani", native: "कोंकणी", sub: "कोंकणींत उलययात (Speech Assisted)", tier: "speech" },
+  { code: "doi", label: "Dogri", native: "डोगरी", sub: "डोगरी च गल्ल करो (Speech Assisted)", tier: "speech" },
+  { code: "brx", label: "Bodo", native: "बड़ो", sub: "बड़ो राव (Speech Assisted)", tier: "speech" },
+  { code: "mni", label: "Manipuri", native: "মৈতৈলোন্", sub: "মৈতৈলোন (Speech Assisted)", tier: "speech" },
 ];
 
 const I18N = {
@@ -843,6 +864,11 @@ const state = {
   consents: [],
   documents: [],
   activeDocumentId: null,
+  docInputMode: "file",
+  cameraStream: null,
+  capturedDocBlob: null,
+  capturedDocDataUrl: null,
+  activeFhirBundle: null,
   ocrResults: {},
   extractions: {},
   intelligences: {},
@@ -954,6 +980,7 @@ function safeProviderErrorMessage(error) {
 }
 
 function setScreen(screen) {
+  stopDocCamera();
   state.screen = screen;
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1097,17 +1124,42 @@ function renderLanguage() {
         <h1 style="font-size: 28px; margin: 8px 0 6px;">${esc(t("lang_title"))}</h1>
         <p class="muted">${esc(t("lang_subtitle"))}</p>
 
-        <div class="two-grid" style="margin-top: 24px;">
-          ${LANGUAGES.map(lang => {
+        <div class="lang-tier-title">
+          <span>🇮🇳</span> Fully Localized Kiosk Interface &amp; Clinical Voice (5 Primary Languages)
+        </div>
+        <div class="lang-grid">
+          ${LANGUAGES.filter(l => l.tier === "full").map(lang => {
             const isSelected = state.language === lang.code;
             return `
-              <button class="choice-card ${isSelected ? "selected" : ""}" data-action="select-lang" data-code="${lang.code}">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <h2>${esc(lang.native)}</h2>
-                  ${isSelected ? `<span class="tag verified">${esc(t("selected_badge", "Selected ✓"))}</span>` : ""}
+              <button class="choice-card lang-card-mini ${isSelected ? "selected" : ""}" data-action="select-lang" data-code="${lang.code}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <h2 style="font-size: 20px;">${esc(lang.native)}</h2>
+                  ${isSelected ? `<span class="tag verified" style="font-size: 11px;">✓ Selected</span>` : `<span class="tag" style="font-size: 10px; background: #e0f2fe; color: #0369a1;">Full UI</span>`}
                 </div>
-                <p style="font-weight: 600; color: var(--ink-light);">${esc(lang.label)}</p>
-                <p>${esc(lang.sub)}</p>
+                <p style="font-weight: 600; color: var(--ink-light); margin-top: 4px; font-size: 14px;">${esc(lang.label)}</p>
+                <p style="font-size: 12.5px; margin-top: 2px;">${esc(lang.sub)}</p>
+              </button>
+            `;
+          }).join("")}
+        </div>
+
+        <div class="lang-tier-title" style="margin-top: 28px;">
+          <span>🎙️</span> 17 Scheduled Languages of India — Speech-Assisted Intake (Groq Whisper Multilingual)
+        </div>
+        <p class="muted" style="font-size: 13.5px; margin-bottom: 12px;">
+          Patients may speak naturally in any of the 22 Eighth Schedule languages. Audio is captured and transcribed via high-accuracy Whisper speech intelligence.
+        </p>
+        <div class="lang-grid">
+          ${LANGUAGES.filter(l => l.tier === "speech").map(lang => {
+            const isSelected = state.language === lang.code;
+            return `
+              <button class="choice-card lang-card-mini ${isSelected ? "selected" : ""}" data-action="select-lang" data-code="${lang.code}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <h3 style="font-size: 17px;">${esc(lang.native)}</h3>
+                  ${isSelected ? `<span class="tag verified" style="font-size: 11px;">✓ Selected</span>` : `<span class="tag automated" style="font-size: 10px;">Whisper</span>`}
+                </div>
+                <p style="font-weight: 600; color: var(--ink-light); margin-top: 2px; font-size: 13.5px;">${esc(lang.label)}</p>
+                <p style="font-size: 12px; margin-top: 2px;">${esc(lang.sub)}</p>
               </button>
             `;
           }).join("")}
@@ -1227,21 +1279,50 @@ function renderConsent() {
             const isActive = consentRec && consentRec.status === "granted";
             const isRevoked = consentRec && consentRec.status === "revoked";
             
-            let statusBadgeHtml = `<span class="status pending">${esc(t("status_not_granted"))}</span>`;
+            let statusBadgeHtml = `<span class="status pending">${esc(t("status_not_granted", "Not Granted"))}</span>`;
+            let actionBtnHtml = `
+              <button class="primary-button" data-action="grant-consent" data-purpose="${p.key}" style="min-height: 38px; padding: 8px 18px; font-size: 14px;">
+                ${esc(t("grant_consent_btn", "✓ Grant Consent"))}
+              </button>
+            `;
+
             if (isActive) {
-              statusBadgeHtml = `<span class="status verified">${esc(t("status_active"))}</span>`;
+              statusBadgeHtml = `<span class="status verified" style="font-weight: 700;">● Active — Granted</span>`;
+              actionBtnHtml = `
+                <button class="outline-button" data-action="revoke-consent" data-consent-id="${consentRec.id}" data-purpose="${p.key}" style="min-height: 38px; padding: 8px 18px; font-size: 14px; color: var(--red-primary); border-color: #fca5a5;">
+                  ${esc(t("revoke_consent_btn", "✕ Revoke Consent"))}
+                </button>
+              `;
             } else if (isRevoked) {
-              statusBadgeHtml = `<span class="status urgent">${esc(t("status_revoked"))}</span>`;
+              statusBadgeHtml = `<span class="status urgent" style="font-weight: 700;">✕ Revoked</span>`;
+              actionBtnHtml = `
+                <button class="primary-button" data-action="grant-consent" data-purpose="${p.key}" style="min-height: 38px; padding: 8px 18px; font-size: 14px; background: var(--blue-primary);">
+                  ↺ Grant Again
+                </button>
+              `;
             }
 
             const pTitle = t("purpose_" + p.key + "_title", p.title);
             const pDesc = t("purpose_" + p.key + "_desc", p.desc);
 
+            const abdmHeader = p.isAbdm ? `
+              <div style="margin: 26px 0 12px; padding: 14px 18px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: var(--radius-md);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 20px;">🛡️</span>
+                  <strong style="color: #166534; font-size: 15px;">ABDM Integration — OPTIONAL &amp; SEPARATED FROM IN-CLINIC CARE</strong>
+                </div>
+                <p style="font-size: 13.5px; color: #14532d; margin-top: 4px;">
+                  Ayushman Bharat Digital Mission record sharing is strictly voluntary. You do NOT need ABDM consent to receive full OPD care today.
+                </p>
+              </div>
+            ` : "";
+
             return `
+              ${abdmHeader}
               <div class="consent-item ${isActive ? "active-consent" : ""} ${p.isAbdm ? "abdm-purpose" : ""}">
                 <div class="consent-head">
                   <div>
-                    <h3>${esc(pTitle)} ${p.requiredForIntake ? `<span class="tag urgent" style="font-size: 10px;">Required</span>` : ""}</h3>
+                    <h3>${esc(pTitle)} ${p.requiredForIntake ? `<span class="tag urgent" style="font-size: 10px;">Required</span>` : p.isAbdm ? `<span class="tag" style="font-size: 10px; background: #e0f2fe; color: #0369a1;">Optional</span>` : ""}</h3>
                   </div>
                   <div>
                     ${statusBadgeHtml}
@@ -1250,16 +1331,8 @@ function renderConsent() {
 
                 <div class="consent-desc">${esc(pDesc)}</div>
 
-                <div class="button-row" style="margin-top: 10px;">
-                  ${!isActive ? `
-                    <button class="primary-button" data-action="grant-consent" data-purpose="${p.key}" style="min-height: 38px; padding: 8px 16px; font-size: 14px;">
-                      ${esc(t("grant_consent_btn"))}
-                    </button>
-                  ` : `
-                    <button class="outline-button" data-action="revoke-consent" data-consent-id="${consentRec.id}" data-purpose="${p.key}" style="min-height: 38px; padding: 8px 16px; font-size: 14px; color: var(--red-primary); border-color: #fca5a5;">
-                      ${esc(t("revoke_consent_btn"))}
-                    </button>
-                  `}
+                <div class="button-row" style="margin-top: 12px;">
+                  ${actionBtnHtml}
                 </div>
               </div>
             `;
@@ -1434,20 +1507,59 @@ function renderDocuments() {
           ${esc(t("doc_subtitle"))}
         </p>
 
-        <!-- DROPZONE / UPLOAD FORM -->
-        <form id="doc-upload-form" style="margin-top: 24px;">
-          <div class="upload-dropzone" id="dropzone-box" onclick="document.querySelector('#file-input').click()">
-            <div class="upload-icon">📄</div>
-            <strong style="font-size: 18px; color: var(--ink);">${esc(t("dropzone_main"))}</strong>
-            <p class="muted" style="margin-top: 6px;">${esc(t("dropzone_sub"))}</p>
-            <input id="file-input" type="file" accept="application/pdf,image/jpeg,image/png">
-          </div>
+        <!-- DOCUMENT INPUT SELECTOR: FILE UPLOAD vs CAMERA SCAN -->
+        <div class="doc-tab-bar">
+          <button type="button" class="doc-tab-btn ${state.docInputMode !== "camera" ? "active" : ""}" data-action="set-doc-mode" data-mode="file">
+            📁 Upload Document File (PDF / Image)
+          </button>
+          <button type="button" class="doc-tab-btn ${state.docInputMode === "camera" ? "active" : ""}" data-action="set-doc-mode" data-mode="camera">
+            📷 Scan with Kiosk Camera
+          </button>
+        </div>
 
-          <div id="file-chosen-notice" style="margin-top: 12px; display: none;" class="message info">
-            <span id="file-chosen-name">No file chosen</span>
-            <button type="submit" class="primary-button" style="margin-left: auto; min-height: 38px; padding: 6px 16px;">${esc(t("upload_file_btn"))}</button>
+        ${state.docInputMode === "camera" ? `
+          <!-- CAMERA VIEWFINDER & SCANNER -->
+          <div class="camera-container">
+            ${state.capturedDocDataUrl ? `
+              <img id="camera-preview-captured" class="camera-preview-captured" src="${state.capturedDocDataUrl}" alt="Captured document preview">
+              <div class="button-row" style="margin-top: 14px; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                <button type="button" class="outline-button" data-action="retake-camera-doc" style="color: #fff; border-color: rgba(255,255,255,0.5);">
+                  ↺ Retake Document Photo
+                </button>
+                <button type="button" class="primary-button" data-action="confirm-upload-camera-doc" style="background: var(--teal-primary);">
+                  ✓ Use Photo &amp; Analyze with Nemotron OCR
+                </button>
+              </div>
+            ` : `
+              <div style="position: relative; width: 100%; max-width: 640px;">
+                <video id="camera-video-stream" class="camera-viewfinder" autoplay playsinline muted></video>
+                <div class="camera-guide-overlay">
+                  <span class="camera-guide-text">Align prescription or report within frame</span>
+                </div>
+              </div>
+              <div class="button-row" style="margin-top: 14px; gap: 12px; justify-content: center;">
+                <button type="button" class="primary-button" data-action="capture-camera-doc" style="font-size: 15px; padding: 10px 24px; background: var(--teal-primary);">
+                  📸 Snap Document Photo
+                </button>
+              </div>
+            `}
           </div>
-        </form>
+        ` : `
+          <!-- DROPZONE / UPLOAD FORM -->
+          <form id="doc-upload-form">
+            <div class="upload-dropzone" id="dropzone-box" onclick="document.querySelector('#file-input').click()">
+              <div class="upload-icon">📄</div>
+              <strong style="font-size: 18px; color: var(--ink);">${esc(t("dropzone_main"))}</strong>
+              <p class="muted" style="margin-top: 6px;">${esc(t("dropzone_sub"))}</p>
+              <input id="file-input" type="file" accept="application/pdf,image/jpeg,image/png">
+            </div>
+
+            <div id="file-chosen-notice" style="margin-top: 12px; display: none;" class="message info">
+              <span id="file-chosen-name">No file chosen</span>
+              <button type="submit" class="primary-button" style="margin-left: auto; min-height: 38px; padding: 6px 16px;">${esc(t("upload_file_btn"))}</button>
+            </div>
+          </form>
+        `}
 
         <div id="upload-feedback" style="margin-top: 14px;"></div>
 
@@ -1704,6 +1816,17 @@ function renderSummary() {
         <div class="two-grid" style="margin-top: 24px;">
           <!-- LEFT COLUMN -->
           <div style="display: grid; gap: 20px;">
+            ${summaryData?.summary ? `
+              <div class="panel" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                <h3 style="font-size: 17px; margin-bottom: 8px; color: #166534; display: flex; align-items: center; gap: 6px;">
+                  <span>🤖</span> <span>AI Clinical Narrative Synthesis</span>
+                </h3>
+                <p style="font-size: 14.5px; color: #1e293b; line-height: 1.6; margin: 0;">
+                  ${esc(summaryData.summary)}
+                </p>
+              </div>
+            ` : ""}
+
             <div class="panel" style="background: #f8fafc;">
               <h3 style="font-size: 18px; margin-bottom: 8px;">${esc(t("summary_hpi_title"))}</h3>
               <p style="font-size: 15px; color: var(--ink-light); line-height: 1.6;">
@@ -1910,9 +2033,22 @@ function renderPhysicianDashboard() {
                 data-consultation-id="${item.consultation_id}"
               >
                 <div class="queue-card-head">
-                  <strong style="font-size: 17px; color: var(--ink);">
-                    👤 ${esc(item.patient_name)}
-                  </strong>
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <strong style="font-size: 17px; color: var(--ink);">
+                      👤 ${esc(item.patient_name)}
+                    </strong>
+                    ${item.priority === "urgent" ? `
+                      <span class="tag urgent pulse-urgent" style="background: #fee2e2; color: #b91c1c; border: 1px solid #f87171; font-weight: 700; font-size: 11px;">
+                        🚨 URGENT TRIAGE ${item.red_flag_reason ? `(${esc(item.red_flag_reason)})` : ""}
+                      </span>
+                    ` : item.priority === "priority" ? `
+                      <span class="tag warning" style="background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; font-weight: 600; font-size: 11px;">
+                        ⚠️ PRIORITY
+                      </span>
+                    ` : `
+                      <span class="tag" style="background: #f1f5f9; color: #475569; font-size: 11px;">Routine</span>
+                    `}
+                  </div>
                   <span class="status ${esc(item.review_status)}">${esc(item.review_status.replace("_", " "))}</span>
                 </div>
                 <div style="font-size: 14px; color: var(--muted); margin-top: 4px;">
@@ -1942,14 +2078,36 @@ function renderPhysicianReviewPacket() {
 
   return `
     <section class="page">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <button class="outline-button" data-action="physician">← Back to Queue</button>
         <div class="button-row">
+          <button
+            class="outline-button"
+            data-action="view-fhir-bundle"
+            data-patient-id="${packet.patient?.patient_id}"
+            data-encounter-id="${packet.encounter?.encounter_id || ""}"
+            style="font-size: 13.5px; border-color: var(--teal-primary); color: var(--teal-dark); font-weight: 600;"
+          >
+            📋 View / Export FHIR R4 Bundle
+          </button>
           <span class="status ${esc(reviewStatus)}" style="font-size: 13px; padding: 6px 14px;">
             Status: ${esc(reviewStatus.replace("_", " "))}
           </span>
         </div>
       </div>
+
+      ${(packet.priority === "urgent" || currentConsultation?.priority === "urgent") ? `
+        <div class="triage-urgent-banner">
+          <div style="font-size: 28px;">🚨</div>
+          <div>
+            <strong style="color: #991b1b; font-size: 16px;">HIGH-SENSITIVITY RED FLAG DETECTED — URGENT TRIAGE ESCALATION</strong>
+            <p style="margin-top: 4px; font-size: 14px; color: #7f1d1d;">
+              Triage Reason: <strong>${esc(packet.red_flag_reason || currentConsultation?.red_flag_reason || "Urgent clinical trigger identified")}</strong>.
+              This patient is prioritized at the top of the outpatient queue.
+            </p>
+          </div>
+        </div>
+      ` : ""}
 
       <div class="physician-layout">
         <!-- SIDEBAR: PATIENT DEMOGRAPHICS & NOTICE -->
@@ -2015,6 +2173,83 @@ function renderPhysicianReviewPacket() {
                   </ul>
                 ` : `<p class="muted" style="font-size: 13px; margin-top: 4px;">None reported</p>`}
               </div>
+            </div>
+          </div>
+
+          <!-- AYUSH DUAL-CODING & DASHAVIDHA PARIKSHA -->
+          <div class="ayush-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <span class="eyebrow" style="color: #854d0e;">AYUSH DUAL-CODING &amp; TRADITIONAL MEDICINE MODULE 2</span>
+                <h3 style="font-size: 20px; margin: 4px 0 2px; color: #713f12;">NAMASTE &amp; WHO ICD-11 Dual-Coding</h3>
+                <p class="muted" style="font-size: 13px;">
+                  Deterministic Local Catalog Lookup (Zero AI Hallucination) · NRCES India Interoperability
+                </p>
+              </div>
+              <span class="ayush-badge ${(packet.ayush_coding?.coding_status === 'mapped') ? 'mapped' : 'unmapped'}">
+                ${(packet.ayush_coding?.coding_status === 'mapped') ? '✓ AYUSH Mapped' : 'Unmapped Condition'}
+              </span>
+            </div>
+
+            <!-- CODES TABLE -->
+            <div style="margin-top: 14px; overflow-x: auto;">
+              <table class="med-table" style="font-size: 13.5px;">
+                <thead>
+                  <tr>
+                    <th>Clinical Concept / Term</th>
+                    <th>System</th>
+                    <th>NAMASTE Code (Ministry of AYUSH)</th>
+                    <th>WHO ICD-11 TM2 Code (Chapter 26)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(packet.ayush_coding?.codes && packet.ayush_coding.codes.length > 0) ? packet.ayush_coding.codes.map(c => `
+                    <tr>
+                      <td><strong>${esc(c.concept)}</strong><br><small class="muted">Matched: "${esc(c.matched_term)}"</small></td>
+                      <td><span class="tag" style="background: #fef3c7; color: #92400e; font-size: 11px;">${esc(c.system)}</span></td>
+                      <td>
+                        ${c.namaste_code ? `<strong>${esc(c.namaste_code)}</strong><br><small class="muted">${esc(c.namaste_term)}</small>` : `<span class="muted">Unmapped in catalog</span>`}
+                      </td>
+                      <td>
+                        ${c.who_icd11_code ? `<strong>${esc(c.who_icd11_code)}</strong><br><small class="muted">${esc(c.who_icd11_term)}</small>` : `<span class="muted">Unmapped in catalog</span>`}
+                      </td>
+                      <td>
+                        <span class="ayush-badge ${c.coding_status === 'mapped' ? 'mapped' : 'unmapped'}">
+                          ${esc(c.coding_status)}
+                        </span>
+                      </td>
+                    </tr>
+                  `).join("") : `
+                    <tr>
+                      <td colspan="5" style="text-align: center; color: var(--muted); padding: 16px;">
+                        No AYUSH diagnostic keywords detected in current visit symptoms.
+                      </td>
+                    </tr>
+                  `}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- DASHAVIDHA PARIKSHA 10-POINT ASSESSMENT CONTEXT -->
+            ${packet.ayush_coding?.dashavidha_pariksha_context ? `
+              <details style="margin-top: 16px; border: 1px solid #e2d9c2; border-radius: var(--radius-sm); padding: 10px 14px; background: #fff;">
+                <summary style="cursor: pointer; font-weight: 700; color: #713f12; font-size: 14px;">
+                  🌿 Dashavidha Pariksha (10-Fold Clinical Examination Framework) Context
+                </summary>
+                <div class="pariksha-grid">
+                  ${Object.entries(packet.ayush_coding.dashavidha_pariksha_context).map(([k, v]) => `
+                    <div class="pariksha-item">
+                      <strong>${esc(k.replace(/^[0-9]+_/, "").replace(/_/g, " "))}</strong>
+                      <span>${esc(v || "Pending Vaidya examination")}</span>
+                    </div>
+                  `).join("")}
+                </div>
+              </details>
+            ` : ""}
+
+            <div style="margin-top: 12px; font-size: 12px; color: #854d0e; font-style: italic;">
+              * Note: AYUSH dual codes are emitted deterministically from the controlled catalog and remain unverified until signed by the attending practitioner.
             </div>
           </div>
 
@@ -2662,6 +2897,92 @@ document.addEventListener("click", async (e) => {
     submitIntakeMessage(confirmedText);
   }
 
+  // Document Input & Camera Scanner Actions
+  else if (action === "set-doc-mode") {
+    const mode = target.dataset.mode || "file";
+    state.docInputMode = mode;
+    state.capturedDocBlob = null;
+    state.capturedDocDataUrl = null;
+    render();
+    if (mode === "camera") {
+      startDocCamera();
+    } else {
+      stopDocCamera();
+    }
+  } else if (action === "capture-camera-doc") {
+    snapDocCamera();
+  } else if (action === "retake-camera-doc") {
+    state.capturedDocBlob = null;
+    state.capturedDocDataUrl = null;
+    render();
+    startDocCamera();
+  } else if (action === "confirm-upload-camera-doc") {
+    if (state.capturedDocBlob) {
+      uploadDocumentBlob(state.capturedDocBlob, `kiosk_camera_scan_${Date.now()}.jpg`);
+    }
+  }
+
+  // FHIR R4 Bundle Modal Actions
+  else if (action === "view-fhir-bundle") {
+    const pid = target.dataset.patientId || state.patientId;
+    const eid = target.dataset.encounterId || state.encounterId;
+    const dialog = document.querySelector("#fhir-dialog");
+    const viewer = document.querySelector("#fhir-json-display");
+    const chips = document.querySelector("#fhir-resource-chips");
+
+    if (viewer) viewer.textContent = "Generating NRCES India FHIR R4 Bundle from clinical database…";
+    if (chips) chips.innerHTML = "";
+    if (dialog) dialog.showModal();
+
+    try {
+      const url = eid ? `/patients/${pid}/fhir?encounter_id=${eid}` : `/patients/${pid}/fhir`;
+      const bundle = await api(url);
+      state.activeFhirBundle = bundle;
+
+      const counts = {};
+      (bundle.entry || []).forEach(e => {
+        const rt = e.resource?.resourceType || "Resource";
+        counts[rt] = (counts[rt] || 0) + 1;
+      });
+
+      if (chips) {
+        chips.innerHTML = Object.entries(counts).map(([rt, cnt]) => `
+          <span class="fhir-chip">${esc(rt)}: ${cnt}</span>
+        `).join("") + `<span class="fhir-chip" style="background: #e0f2fe; color: #0369a1; border-color: #38bdf8;">Bundle total: ${bundle.total || (bundle.entry || []).length}</span>`;
+      }
+
+      if (viewer) {
+        viewer.textContent = JSON.stringify(bundle, null, 2);
+      }
+    } catch (err) {
+      if (viewer) viewer.textContent = "Failed to generate FHIR R4 Bundle: " + err.message;
+    }
+  } else if (action === "download-fhir-json") {
+    if (!state.activeFhirBundle) return;
+    const jsonStr = JSON.stringify(state.activeFhirBundle, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `medikiosk_fhir_r4_bundle_${state.activeFhirBundle.id || Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } else if (action === "copy-fhir-json") {
+    if (!state.activeFhirBundle) return;
+    const jsonStr = JSON.stringify(state.activeFhirBundle, null, 2);
+    navigator.clipboard.writeText(jsonStr).then(() => {
+      target.textContent = "✓ Copied!";
+      setTimeout(() => { target.textContent = "📋 Copy to Clipboard"; }, 2000);
+    }).catch(() => {
+      alert("Could not copy to clipboard. Please select and copy manually.");
+    });
+  } else if (action === "close-fhir-dialog") {
+    const dialog = document.querySelector("#fhir-dialog");
+    if (dialog) dialog.close();
+  }
+
   // Staff Call Modal
   else if (action === "nurse") {
     document.querySelector("#staff-dialog").showModal();
@@ -2669,6 +2990,100 @@ document.addEventListener("click", async (e) => {
     document.querySelector("#staff-dialog").close();
   }
 });
+
+/* =========================================================================
+   CAMERA DOCUMENT SCANNER HELPERS
+   ========================================================================= */
+
+async function startDocCamera() {
+  stopDocCamera();
+  const out = document.querySelector("#upload-feedback");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (out) out.innerHTML = statusBadge("error", "Camera hardware is not accessible in this browser.");
+    state.docInputMode = "file";
+    render();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    state.cameraStream = stream;
+    const videoEl = document.querySelector("#camera-video-stream");
+    if (videoEl) {
+      videoEl.srcObject = stream;
+      await videoEl.play().catch(() => {});
+    }
+  } catch (err) {
+    if (out) out.innerHTML = statusBadge("warning", `Camera access error: ${err.message}. Please use file upload.`);
+    state.docInputMode = "file";
+    render();
+  }
+}
+
+function stopDocCamera() {
+  if (state.cameraStream) {
+    try {
+      state.cameraStream.getTracks().forEach(t => t.stop());
+    } catch (e) {}
+    state.cameraStream = null;
+  }
+}
+
+function snapDocCamera() {
+  const videoEl = document.querySelector("#camera-video-stream");
+  if (!videoEl) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = videoEl.videoWidth || 1280;
+  canvas.height = videoEl.videoHeight || 720;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+  stopDocCamera();
+  canvas.toBlob((blob) => {
+    state.capturedDocBlob = blob;
+    state.capturedDocDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    render();
+  }, "image/jpeg", 0.92);
+}
+
+async function uploadDocumentBlob(blob, filename = "camera_document_scan.jpg") {
+  const out = document.querySelector("#upload-feedback");
+  if (out) out.innerHTML = statusBadge("info", "Uploading camera capture to secure hospital storage…");
+  const formData = new FormData();
+  formData.append("patient_id", state.patientId);
+  if (state.encounterId) formData.append("encounter_id", state.encounterId);
+  formData.append("file", blob, filename);
+
+  try {
+    const doc = await api("/documents/upload", {
+      method: "POST",
+      body: formData,
+      timeout: 45000,
+    });
+    state.documents.push(doc);
+    state.activeDocumentId = doc.id;
+    state.capturedDocBlob = null;
+    state.capturedDocDataUrl = null;
+    state.docInputMode = "file";
+    render();
+
+    // Auto-run OCR on the uploaded image
+    const docItem = state.documents.find(d => d.id === doc.id);
+    if (docItem) {
+      try {
+        const ocrRes = await api(`/documents/${doc.id}/ocr`, { method: "POST", timeout: 60000 });
+        state.ocrResults[doc.id] = ocrRes;
+        docItem.ocr_status = "completed";
+        render();
+      } catch (ocrErr) {
+        console.warn("Auto OCR background error:", ocrErr);
+      }
+    }
+  } catch (err) {
+    if (out) out.innerHTML = statusBadge("error", err.message);
+  }
+}
 
 /* =========================================================================
    CLINICAL MESSAGE SUBMISSION (GROQ GPT OSS 120B)

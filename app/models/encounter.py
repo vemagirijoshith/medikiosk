@@ -18,6 +18,10 @@ class Encounter(Base):
     status: Mapped[str] = mapped_column(
         String(30), nullable=False, default="in_progress"
     )
+    priority: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="routine", server_default="routine"
+    )
+    red_flag_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

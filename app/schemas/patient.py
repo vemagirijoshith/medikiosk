@@ -13,6 +13,8 @@ class PatientCreate(BaseModel):
 
 
 class PatientResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     age: int
@@ -20,9 +22,6 @@ class PatientResponse(BaseModel):
     phone: str | None
     abha_id: str | None
     language: str
-
-    class Config:
-        from_attributes = True
 
 
 class ConsultationCreate(BaseModel):
@@ -38,6 +37,8 @@ class ConsultationResponse(BaseModel):
     patient_id: int
     encounter_id: int
     review_status: str
+    priority: str = "routine"
+    red_flag_reason: str | None = None
     created_at: datetime
 
 
@@ -48,4 +49,6 @@ class PhysicianReviewListItem(BaseModel):
     encounter_id: int
     chief_complaint: str | None
     review_status: str
+    priority: str = "routine"
+    red_flag_reason: str | None = None
     created_at: datetime

@@ -4,3 +4,5 @@ __pycache__/
 venv/
 storage/documents/
 medikiosk-local.db
+.pytest_cache/
+scratch/

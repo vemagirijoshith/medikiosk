@@ -18,6 +18,8 @@ class PacketEncounter(BaseModel):
     encounter_id: int
     started_at: datetime | None = None
     chief_complaint: str | None = None
+    priority: str = "routine"
+    red_flag_reason: str | None = None
 
 
 class PacketDocument(BaseModel):
@@ -37,6 +39,8 @@ class PacketConsultation(BaseModel):
     consultation_id: int
     encounter_id: int
     review_status: ReviewStatus
+    priority: str = "routine"
+    red_flag_reason: str | None = None
     physician_notes: str | None = None
     existing_notes: str | None = None
     physician_id: str | None = None
@@ -55,6 +59,9 @@ class ClinicalSummaryPacket(BaseModel):
 class PhysicianReviewPacket(BaseModel):
     patient: PacketPatient
     encounter: PacketEncounter | None = None
+    priority: str = "routine"
+    red_flag_reason: str | None = None
+    ayush_coding: dict[str, Any] | None = None
     symptoms: list[dict[str, Any]]
     medications: list[dict[str, Any]]
     allergies: list[dict[str, Any]]
@@ -66,6 +73,7 @@ class PhysicianReviewPacket(BaseModel):
     clinical_summary: ClinicalSummaryPacket
     consultations: list[PacketConsultation]
     physician_verification_notice: str
+
 
 
 class PhysicianReviewNotesRequest(BaseModel):

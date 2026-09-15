@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -5,6 +7,7 @@ from app.db.database import get_db
 from app.models.consultation import Consultation
 from app.models.encounter import Encounter
 from app.models.patient import Patient
+from app.schemas.ayush_coding import AyushCodingResponse
 from app.schemas.patient import (
     ConsultationCreate,
     ConsultationResponse,
@@ -12,6 +15,8 @@ from app.schemas.patient import (
     PatientResponse,
     PhysicianReviewListItem,
 )
+from app.services.ayush_coding_service import map_ayush_codes
+from app.services.fhir_service import generate_fhir_r4_bundle
 
 
 router = APIRouter(
@@ -73,7 +78,14 @@ def create_consultation(
         .first()
     )
     if consultation is None:
-        consultation = Consultation(patient_id=patient_id, encounter_id=encounter.id)
+        enc_priority = getattr(encounter, "priority", "routine") or "routine"
+        enc_red_flag = getattr(encounter, "red_flag_reason", None)
+        consultation = Consultation(
+            patient_id=patient_id,
+            encounter_id=encounter.id,
+            priority=enc_priority,
+            red_flag_reason=enc_red_flag,
+        )
         db.add(consultation)
         db.commit()
         db.refresh(consultation)
@@ -86,11 +98,19 @@ def create_consultation(
     summary="List locally pending physician review records for the demo dashboard",
 )
 def list_physician_reviews(db: Session = Depends(get_db)):
+    from sqlalchemy import case
+
+    priority_rank = case(
+        (Consultation.priority == "urgent", 1),
+        (Consultation.priority == "priority", 2),
+        else_=3
+    )
+
     records = (
         db.query(Consultation, Patient, Encounter)
         .join(Patient, Consultation.patient_id == Patient.id)
         .join(Encounter, Consultation.encounter_id == Encounter.id)
-        .order_by(Consultation.created_at.desc())
+        .order_by(priority_rank, Consultation.created_at.desc())
         .all()
     )
     return [
@@ -101,10 +121,13 @@ def list_physician_reviews(db: Session = Depends(get_db)):
             "encounter_id": encounter.id,
             "chief_complaint": encounter.chief_complaint,
             "review_status": consultation.review_status,
+            "priority": consultation.priority or getattr(encounter, "priority", "routine") or "routine",
+            "red_flag_reason": consultation.red_flag_reason or getattr(encounter, "red_flag_reason", None),
             "created_at": consultation.created_at,
         }
         for consultation, patient, encounter in records
     ]
+
 
 
 @router.get(
@@ -119,3 +142,37 @@ def get_patient(
     if not patient:
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
+
+
+@router.get(
+    "/{patient_id}/ayush-coding",
+    response_model=AyushCodingResponse,
+    summary="Get AYUSH NAMASTE and WHO ICD-11 dual-coding mapping for patient history",
+)
+def get_patient_ayush_coding(
+    patient_id: int,
+    encounter_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    patient = db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return map_ayush_codes(db, patient_id, encounter_id)
+
+
+@router.get(
+    "/{patient_id}/fhir",
+    response_model=dict[str, Any],
+    summary="Generate NRCES India FHIR R4 Bundle for patient encounter",
+)
+def get_patient_fhir_bundle(
+    patient_id: int,
+    encounter_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    patient = db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    bundle = generate_fhir_r4_bundle(db, patient_id, encounter_id)
+    return bundle
+

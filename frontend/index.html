@@ -55,6 +55,37 @@
     </div>
   </dialog>
 
+  <dialog id="fhir-dialog" class="fhir-modal">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+      <div>
+        <span class="eyebrow" style="color: var(--teal-primary);">INTEROPERABILITY STANDARDS · NRCES INDIA</span>
+        <h2 style="font-size: 22px; margin: 4px 0;">FHIR R4 Consultation Bundle</h2>
+        <p class="muted" style="font-size: 13.5px;">
+          Generated per NRCES India FHIR R4 Implementation Guide (Patient, Encounter, Condition, Observation, MedicationStatement, AllergyIntolerance)
+        </p>
+      </div>
+      <button class="quiet-button" data-action="close-fhir-dialog" style="font-size: 20px; padding: 4px 10px;" aria-label="Close">✕</button>
+    </div>
+
+    <div id="fhir-resource-chips" class="fhir-chip-bar"></div>
+
+    <pre id="fhir-json-display" class="fhir-viewer">Loading FHIR R4 Bundle…</pre>
+
+    <div class="button-row" style="justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="outline-button" data-action="download-fhir-json">
+          📥 Download JSON Bundle
+        </button>
+        <button type="button" class="outline-button" data-action="copy-fhir-json">
+          📋 Copy to Clipboard
+        </button>
+      </div>
+      <button type="button" class="primary-button" data-action="close-fhir-dialog">
+        Close Viewer
+      </button>
+    </div>
+  </dialog>
+
   <script src="app.js"></script>
 </body>
 </html>

@@ -28,6 +28,10 @@ class Consultation(Base):
     review_status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", server_default="pending"
     )
+    priority: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="routine", server_default="routine"
+    )
+    red_flag_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     physician_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     physician_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

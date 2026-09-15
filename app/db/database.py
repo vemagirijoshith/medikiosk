@@ -99,6 +99,26 @@ def ensure_physician_review_columns():
                 connection.execute(text(statement))
 
 
+def ensure_queue_priority_columns():
+    """Ensure priority and red_flag_reason columns exist on encounters and consultations."""
+    if engine.dialect.name != "postgresql":
+        return
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        if inspector.has_table("encounters"):
+            encounter_cols = {col["name"] for col in inspector.get_columns("encounters")}
+            if "priority" not in encounter_cols:
+                connection.execute(text("ALTER TABLE encounters ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT 'routine'"))
+            if "red_flag_reason" not in encounter_cols:
+                connection.execute(text("ALTER TABLE encounters ADD COLUMN red_flag_reason TEXT"))
+        if inspector.has_table("consultations"):
+            consult_cols = {col["name"] for col in inspector.get_columns("consultations")}
+            if "priority" not in consult_cols:
+                connection.execute(text("ALTER TABLE consultations ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT 'routine'"))
+            if "red_flag_reason" not in consult_cols:
+                connection.execute(text("ALTER TABLE consultations ADD COLUMN red_flag_reason TEXT"))
+
+
 def get_db():
     db = SessionLocal()
 
@@ -106,3 +126,4 @@ def get_db():
         yield db
     finally:
         db.close()
+

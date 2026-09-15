@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.models.consultation import Consultation
 from app.models.encounter import Encounter
 from app.models.patient import Patient
 from app.models.symptom import Symptom
@@ -51,21 +52,25 @@ _conversations: dict[int, list[dict[str, str]]] = {}
 
 def _red_flags_for_message(message: str) -> list[RedFlag]:
     patterns = (
-        r"severe chest pain|chest pain.*(severe|crushing|pressure)",
-        r"(severe|very bad|cannot) .*breath|difficulty breathing|shortness of breath",
-        r"loss of consciousness|passed out|unconscious",
-        r"uncontrolled bleeding|bleeding heavily|bleeding a lot",
-        r"sudden.*(weakness|numbness|paralysis|confusion|speech)",
+        (r"chest pain|chest tightness|chest pressure|crushing chest|angina|heart attack", "Chest pain or potential cardiac distress reported"),
+        (r"breathless|shortness of breath|difficulty breathing|cannot breathe|trouble breathing|struggling to breathe", "Severe respiratory distress or breathlessness reported"),
+        (r"loss of consciousness|passed out|unconscious|fainted|fainting|blackout|blacked out|seizure|convulsion", "Loss of consciousness, fainting, or neurological event reported"),
+        (r"uncontrolled bleeding|bleeding heavily|bleeding a lot|vomiting blood|coughing up blood|active bleeding|severe bleeding", "Severe or uncontrolled bleeding reported"),
+        (r"sudden.*(weakness|numbness|paralysis|confusion|speech)|facial droop|slurred speech|stroke", "Acute neurological weakness or stroke signs reported"),
+        (r"severe dizziness|sudden dizziness|extreme dizziness", "Severe acute dizziness reported"),
     )
-    if any(re.search(pattern, message.lower()) for pattern in patterns):
-        return [
-            RedFlag(
-                type="urgent_symptom",
-                severity="high",
-                message="Potential urgent symptom reported; staff review required.",
+    lower = message.lower()
+    flags = []
+    for pattern, reason in patterns:
+        if re.search(pattern, lower):
+            flags.append(
+                RedFlag(
+                    type="urgent_symptom",
+                    severity="high",
+                    message=f"Potential urgent symptom: {reason}. Immediate healthcare professional evaluation recommended.",
+                )
             )
-        ]
-    return []
+    return flags
 
 
 def _parse_ai_output(raw: str) -> ClinicalOutput:
@@ -208,10 +213,25 @@ async def send_intake_message(
     all_flags = local_flags + output.red_flags
     if local_flags and output.status == "collecting":
         output.status = "needs_staff_attention"
+
+    # Emergency queue priority: monotonic escalation (only moves up, never down)
+    if all_flags or local_flags:
+        encounter.priority = "urgent"
+        reasons = [f.message for f in (local_flags or all_flags) if getattr(f, 'message', None)]
+        encounter.red_flag_reason = "; ".join(reasons) if reasons else "Urgent clinical symptom flagged during intake"
+    elif getattr(encounter, "priority", None) is None:
+        encounter.priority = "routine"
+
     _persist_clinical_data(db, encounter, output.clinical_data)
     encounter.status = output.status
     if output.status != "collecting":
         encounter.completed_at = datetime.now(timezone.utc)
+
+    consultation = db.query(Consultation).filter(Consultation.encounter_id == encounter.id).first()
+    if consultation and encounter.priority == "urgent":
+        consultation.priority = "urgent"
+        consultation.red_flag_reason = encounter.red_flag_reason
+
     db.commit()
 
     conversation.append({"role": "assistant", "content": output.assistant_message})
