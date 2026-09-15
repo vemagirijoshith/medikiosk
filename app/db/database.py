@@ -23,9 +23,6 @@ Base = declarative_base()
 
 
 def ensure_document_upload_columns():
-    if engine.dialect.name != "postgresql":
-        return
-
     inspector = inspect(engine)
     if not inspector.has_table("documents"):
         return
@@ -44,16 +41,13 @@ def ensure_document_upload_columns():
 
 
 def ensure_consent_columns():
-    if engine.dialect.name != "postgresql":
-        return
-
     inspector = inspect(engine)
     if not inspector.has_table("consents"):
         return
     existing_columns = {column["name"] for column in inspector.get_columns("consents")}
     additions = {
         "status": "ALTER TABLE consents ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'granted'",
-        "revoked_at": "ALTER TABLE consents ADD COLUMN revoked_at TIMESTAMP WITH TIME ZONE",
+        "revoked_at": "ALTER TABLE consents ADD COLUMN revoked_at TIMESTAMP",
         "source": "ALTER TABLE consents ADD COLUMN source VARCHAR(50)",
         "metadata": "ALTER TABLE consents ADD COLUMN metadata TEXT",
     }
@@ -63,13 +57,11 @@ def ensure_consent_columns():
                 connection.execute(text(statement))
         if "granted" in existing_columns:
             connection.execute(
-                text("UPDATE consents SET status = 'revoked' WHERE granted = FALSE AND status = 'granted'")
+                text("UPDATE consents SET status = 'revoked' WHERE granted = 0 AND status = 'granted'")
             )
 
 
 def ensure_patient_abha_index():
-    if engine.dialect.name != "postgresql":
-        return
     inspector = inspect(engine)
     if not inspector.has_table("patients"):
         return
@@ -81,8 +73,6 @@ def ensure_patient_abha_index():
 
 def ensure_physician_review_columns():
     """Add D3 fields without altering existing consultation data."""
-    if engine.dialect.name != "postgresql":
-        return
     inspector = inspect(engine)
     if not inspector.has_table("consultations"):
         return
@@ -91,7 +81,7 @@ def ensure_physician_review_columns():
         "review_status": "ALTER TABLE consultations ADD COLUMN review_status VARCHAR(20) NOT NULL DEFAULT 'pending'",
         "physician_id": "ALTER TABLE consultations ADD COLUMN physician_id VARCHAR(255)",
         "physician_notes": "ALTER TABLE consultations ADD COLUMN physician_notes TEXT",
-        "reviewed_at": "ALTER TABLE consultations ADD COLUMN reviewed_at TIMESTAMP WITH TIME ZONE",
+        "reviewed_at": "ALTER TABLE consultations ADD COLUMN reviewed_at TIMESTAMP",
     }
     with engine.begin() as connection:
         for column_name, statement in additions.items():
@@ -101,8 +91,6 @@ def ensure_physician_review_columns():
 
 def ensure_queue_priority_columns():
     """Ensure priority and red_flag_reason columns exist on encounters and consultations."""
-    if engine.dialect.name != "postgresql":
-        return
     inspector = inspect(engine)
     with engine.begin() as connection:
         if inspector.has_table("encounters"):
