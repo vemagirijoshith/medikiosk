@@ -4,15 +4,27 @@
  */
 
 const CONFIG = window.MEDIKIOSK_CONFIG || {};
+
+// ── Environment detection (inline fallback if config.js fails to load) ───────
+// Primary signal: config.js sets IS_LOCAL explicitly.
+// Secondary (fallback): derive from hostname — do NOT use window.location.port.
+// Vercel deployments (*.vercel.app) are ALWAYS production, regardless of any
+// other signal.
+const _rawHost = (window.location.hostname || "").toLowerCase();
+const _isVercel = _rawHost === "medikiosk-ebon.vercel.app" || _rawHost.endsWith(".vercel.app");
 const IS_LOCAL = typeof CONFIG.IS_LOCAL === "boolean"
   ? CONFIG.IS_LOCAL
-  : (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.port === "8001");
+  : (!_isVercel && (
+      _rawHost === "localhost"    ||
+      _rawHost === "127.0.0.1"   ||
+      _rawHost === "0.0.0.0"     ||
+      _rawHost.endsWith(".local") ||
+      window.location.protocol === "file:"
+    ));
 
 const API_BASE = typeof CONFIG.API_BASE === "string"
   ? CONFIG.API_BASE
-  : (IS_LOCAL
-      ? (window.location.origin.includes(':8001') ? '' : 'http://127.0.0.1:8001')
-      : 'https://medikiosk-yri0.onrender.com');
+  : (IS_LOCAL ? "http://127.0.0.1:8001" : "https://medikiosk-yri0.onrender.com");
 
 const API_TIMEOUT = 35000;
 
@@ -964,19 +976,33 @@ async function api(endpoint, options = {}) {
 
 async function checkBackendHealth() {
   const connEl = document.querySelector("#connection-status");
-  const lblEl = document.querySelector("#backend-label");
+  const lblEl  = document.querySelector("#backend-label");
   try {
-    const res = await api("/healthz", { timeout: 4000 });
+    // Use a 15 s timeout — Render free tier may take up to 10 s on cold start.
+    // Cache-bust with timestamp so CDNs / proxies never serve a stale 200.
+    const res = await api(`/healthz?t=${Date.now()}`, { timeout: 15000 });
+
+    // Accept both {"status":"ok"} and {"status":"healthy"}
+    // Reject anything else (empty body parsed as {}, wrong format, etc.)
+    const isHealthy = res && (res.status === "ok" || res.status === "healthy");
+    if (!isHealthy) throw new Error("Unexpected /healthz response — backend may be starting up");
+
     state.backendConnected = true;
     if (connEl && lblEl) {
       connEl.className = "connection online";
-      lblEl.textContent = IS_LOCAL ? "Backend :8001 Ready" : "Backend Connected";
+      lblEl.textContent = "Connected";
+      const targetLabel = IS_LOCAL
+        ? "Local FastAPI (:8001) — Connected"
+        : `Render Backend (${API_BASE}) — Connected`;
+      connEl.setAttribute("title", targetLabel);
     }
-  } catch (e) {
+  } catch (_err) {
+    // Do NOT surface raw error text — patients must never see internal details
     state.backendConnected = false;
     if (connEl && lblEl) {
       connEl.className = "connection offline";
-      lblEl.textContent = "Backend Offline";
+      lblEl.textContent = "Offline";
+      connEl.setAttribute("title", "Backend Offline — reconnecting automatically…");
     }
   }
 }

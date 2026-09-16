@@ -41,6 +41,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Production Vercel frontend
+        "https://medikiosk-ebon.vercel.app",
+        # Local development origins
         "http://127.0.0.1:8001",
         "http://localhost:8001",
         "http://127.0.0.1:3000",
@@ -49,12 +52,14 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5500",
         "http://localhost:5500",
-        "https://medikiosk-ebon.vercel.app",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # NOTE: allow_origin_regex is intentionally NOT used here.
+    # Combining allow_origin_regex with allow_credentials=True can cause
+    # Starlette to silently omit Access-Control-Allow-Origin on some
+    # preflight paths. Use explicit origins only.
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -72,9 +77,16 @@ app.mount("/kiosk", StaticFiles(directory=frontend_dir, html=True), name="kiosk"
 
 @app.get("/healthz")
 def healthz():
-    return {
-        "status": "ok"
-    }
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content={"status": "ok"},
+        headers={
+            # Prevent CDNs, proxies, and mobile browsers from caching the
+            # health response — always fetch fresh from Render.
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        }
+    )
 
 
 @app.get("/")
