@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#087b73">
+  <meta name="description" content="MediKiosk - Smart India Hackathon 2026 AI-powered Patient Intake and Clinical History Platform">
+  <title>MediKiosk | Smart Clinical Intake & Patient Care</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" data-action="home" aria-label="MediKiosk Home">
+      <span class="brand-mark">+</span>
+      <span>
+        <strong>Medi<span>Kiosk</span></strong>
+        <small>PATIENT CARE &amp; CLINICAL INTAKE</small>
+      </span>
+    </button>
+    
+    <div class="header-center">
+      <span class="sih-tag">SIH 2026 Patient Caretaking</span>
+    </div>
+
+    <div class="header-actions">
+      <span class="connection" id="connection-status" title="FastAPI Backend Status">
+        <i class="dot"></i> <span id="backend-label">Connecting…</span>
+      </span>
+      <button class="quiet-button" data-action="language-menu" title="Change Language" id="current-lang-btn">
+        🌐 English
+      </button>
+      <button class="quiet-button portal-btn" data-action="physician" title="Physician Workspace">
+        👨‍⚕️ Physician Review
+      </button>
+      <button class="danger-button" data-action="nurse" title="Request immediate staff assistance">
+        🚨 Call Staff
+      </button>
+    </div>
+  </header>
+
+  <main id="app" aria-live="polite"></main>
+
+  <dialog id="staff-dialog">
+    <div class="dialog-icon">!</div>
+    <h2>Staff Assistance Requested</h2>
+    <p>Please remain at the kiosk. A hospital staff member is being alerted to your kiosk station.</p>
+    <div class="alert-box urgent-note">
+      <strong>Important:</strong> If you or someone nearby is experiencing an immediate medical emergency (e.g. chest pain, severe difficulty breathing, sudden collapse), please alert nearby emergency personnel immediately.
+    </div>
+    <div class="button-row" style="justify-content: flex-end; margin-top: 18px;">
+      <button class="primary-button" data-action="close-dialog">I Understand</button>
+    </div>
+  </dialog>
+
+  <dialog id="fhir-dialog" class="fhir-modal">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+      <div>
+        <span class="eyebrow" style="color: var(--teal-primary);">INTEROPERABILITY STANDARDS · NRCES INDIA</span>
+        <h2 style="font-size: 22px; margin: 4px 0;">FHIR R4 Consultation Bundle</h2>
+        <p class="muted" style="font-size: 13.5px;">
+          Generated per NRCES India FHIR R4 Implementation Guide (Patient, Encounter, Condition, Observation, MedicationStatement, AllergyIntolerance)
+        </p>
+      </div>
+      <button class="quiet-button" data-action="close-fhir-dialog" style="font-size: 20px; padding: 4px 10px;" aria-label="Close">✕</button>
+    </div>
+
+    <div id="fhir-resource-chips" class="fhir-chip-bar"></div>
+
+    <pre id="fhir-json-display" class="fhir-viewer">Loading FHIR R4 Bundle…</pre>
+
+    <div class="button-row" style="justify-content: space-between; margin-top: 16px; flex-wrap: wrap; gap: 10px;">
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="outline-button" data-action="download-fhir-json">
+          📥 Download JSON Bundle
+        </button>
+        <button type="button" class="outline-button" data-action="copy-fhir-json">
+          📋 Copy to Clipboard
+        </button>
+      </div>
+      <button type="button" class="primary-button" data-action="close-fhir-dialog">
+        Close Viewer
+      </button>
+    </div>
+  </dialog>
+
+  <script src="config.js?v=20260916c"></script>
+  <script src="app.js?v=20260916c"></script>
+</body>
+</html>
