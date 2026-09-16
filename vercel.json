@@ -1,0 +1,22 @@
+{
+  "buildCommand": null,
+  "outputDirectory": "frontend",
+  "installCommand": null,
+  "framework": null,
+  "headers": [
+    {
+      "source": "/config.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/app.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
+    }
+  ]
+}
