@@ -1,5 +1,10 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -19,23 +24,63 @@ from app.api.consent import router as consent_router
 from app.api.abdm import router as abdm_router
 from app.api.physician_review import router as physician_review_router
 
+_log = logging.getLogger("medikiosk.keepalive")
 
-try:
-    ensure_document_upload_columns()
-    ensure_consent_columns()
-    ensure_physician_review_columns()
-    ensure_queue_priority_columns()
-    Base.metadata.create_all(bind=engine)
-    ensure_patient_abha_index()
-except Exception as exc:
-    import logging
-    logging.getLogger("uvicorn.error").warning(f"Database schema auto-init deferred: {exc}")
+# ── Keep-alive: prevent Render free-tier sleep ────────────────────────────────
+# Render spins down free services after ~15 min of inactivity.
+# This background task pings the service's own /healthz every 10 minutes so
+# Render always sees traffic and never sleeps.
+SELF_URL = os.environ.get(
+    "RENDER_EXTERNAL_URL",          # Render injects this automatically
+    "https://medikiosk-yri0.onrender.com",  # hard-coded fallback
+)
+KEEPALIVE_INTERVAL = 10 * 60  # 10 minutes — inside Render's 15-min sleep window
+
+
+async def _keepalive_loop():
+    """Ping own /healthz every 10 min so Render never goes to sleep."""
+    await asyncio.sleep(30)  # let the server fully start before first ping
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.get(f"{SELF_URL}/healthz")
+                _log.info("Keep-alive ping → %s  status=%s", SELF_URL, r.status_code)
+        except Exception as exc:
+            _log.warning("Keep-alive ping failed (will retry): %s", exc)
+        await asyncio.sleep(KEEPALIVE_INTERVAL)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ───────────────────────────────────────────────────────────────
+    try:
+        ensure_document_upload_columns()
+        ensure_consent_columns()
+        ensure_physician_review_columns()
+        ensure_queue_priority_columns()
+        Base.metadata.create_all(bind=engine)
+        ensure_patient_abha_index()
+    except Exception as exc:
+        _log.warning("Database schema auto-init deferred: %s", exc)
+
+    task = asyncio.create_task(_keepalive_loop())
+    _log.info("Keep-alive task started — pinging %s every %ds", SELF_URL, KEEPALIVE_INTERVAL)
+
+    yield  # ── server is running ──────────────────────────────────────────────
+
+    # ── Shutdown ──────────────────────────────────────────────────────────────
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
     title="MediKiosk API",
     description="AI-powered Clinical History Platform",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
