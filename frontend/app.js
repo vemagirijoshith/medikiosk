@@ -977,13 +977,20 @@ async function api(endpoint, options = {}) {
 async function checkBackendHealth() {
   const connEl = document.querySelector("#connection-status");
   const lblEl  = document.querySelector("#backend-label");
+
+  // Show an intermediate "Waking up" state during Render cold-start
+  // (free tier can take 20-50 s to wake from sleep).
+  if (connEl && lblEl && lblEl.textContent !== "Connected") {
+    connEl.className = "connection";
+    lblEl.textContent = "Connecting…";
+  }
+
   try {
-    // Use a 15 s timeout — Render free tier may take up to 10 s on cold start.
-    // Cache-bust with timestamp so CDNs / proxies never serve a stale 200.
-    const res = await api(`/healthz?t=${Date.now()}`, { timeout: 15000 });
+    // 40 s timeout — Render free tier sleeps after inactivity and needs up to
+    // 50 s on cold start. We must not declare "Offline" prematurely.
+    const res = await api(`/healthz?t=${Date.now()}`, { timeout: 40000 });
 
     // Accept both {"status":"ok"} and {"status":"healthy"}
-    // Reject anything else (empty body parsed as {}, wrong format, etc.)
     const isHealthy = res && (res.status === "ok" || res.status === "healthy");
     if (!isHealthy) throw new Error("Unexpected /healthz response — backend may be starting up");
 
@@ -3341,5 +3348,5 @@ async function loadClinicalSummary() {
    ========================================================================= */
 
 checkBackendHealth();
-setInterval(checkBackendHealth, 15000);
+setInterval(checkBackendHealth, 45000);
 render();

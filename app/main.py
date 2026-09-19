@@ -71,9 +71,10 @@ app.include_router(consent_router)
 app.include_router(abdm_router)
 app.include_router(physician_review_router)
 
-frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
-app.mount("/kiosk", StaticFiles(directory=frontend_dir, html=True), name="kiosk")
-
+# ── Health & root routes MUST be registered BEFORE StaticFiles mount ─────────
+# Starlette's StaticFiles is a sub-application that catches any unmatched path.
+# If it were mounted first, requests to /healthz could be intercepted and return
+# 404 instead of the JSON response, making the service appear offline.
 
 @app.get("/healthz")
 def healthz():
@@ -95,3 +96,6 @@ def root():
         "message": "MediKiosk Backend is running 🚀"
     }
 
+
+frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+app.mount("/kiosk", StaticFiles(directory=frontend_dir, html=True), name="kiosk")
